@@ -57,14 +57,37 @@ public class OperacionesService {
       return productosDevolver;
 
     } catch (SQLException e) {
-        throw new ReglaNegocioException("Error");
+        throw new ReglaNegocioException("Erroren buscar");
     }
 
     // throw pendiente();
   }
 
   public long revisarPrecio(long id, BigDecimal porcentaje) {
-    throw pendiente();
+    if (porcentaje == null
+        || porcentaje.scale() > 2
+        || porcentaje.compareTo(BigDecimal.valueOf(-50)) < 0
+        || porcentaje.compareTo(BigDecimal.valueOf(100)) > 0) {
+      throw new ReglaNegocioException(
+          "El porcentaje debe estar entre -50 y 100, con hasta dos decimales.");
+    }
+
+    try (Connection c = db.abrir()) {
+      Producto p = productos.buscar(c, id);
+      if (p == null) throw new ReglaNegocioException("Producto nulo");
+      long nuevoPrecio =
+          BigDecimal.valueOf(p.precioCentimos())
+              .multiply(BigDecimal.valueOf(100).add(porcentaje))
+              .divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP)
+              .longValueExact();
+      if (nuevoPrecio <= 0 || nuevoPrecio > 100_000_000) {
+        throw new ReglaNegocioException(
+            "El nuevo precio debe estar entre 0,01 y 1.000.000 €.");
+      }
+      return nuevoPrecio;
+    } catch (SQLException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   // TODO Aplicación y Reto avanzado: registrar entregas completas de forma segura.
